@@ -1,0 +1,130 @@
+// This is your Prisma schema file
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "windows"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// Модель для пользователей
+model User {
+  id        String      @id @default(cuid())
+  email     String      @unique
+  name      String?
+  contracts Contract[]
+  budgets   Budget[]
+  vehicles  Vehicle[]   // Добавляем связь с автомобилями
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+// Модель для кошторисів
+model Budget {
+  id            String     @id @default(cuid())
+  name          String     // Назва кошторису
+  type          String     // Тип (загальний/спеціальний фонд)
+  year          Int        // Рік
+  date          DateTime   // Дата кошторису
+  description   String?    // Опис
+  totalAmount   Float      // Загальна сума кошторису
+  usedAmount    Float      @default(0) // Використана сума
+  kekv          KEKV[]     // Зв'язок з КЕКВ
+  contracts     Contract[] // Зв'язок з договорами
+  user          User       @relation(fields: [userId], references: [id])
+  userId        String
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+}
+
+// Модель для КЕКВ (Коди економічної класифікації видатків)
+model KEKV {
+  id            String     @id @default(cuid())
+  code          String     // Код КЕКВ (наприклад, 2210)
+  name          String     // Назва (наприклад, "Предмети, матеріали, обладнання та інвентар")
+  plannedAmount Float      // Планова сума
+  usedAmount    Float      @default(0) // Використана сума
+  budget        Budget     @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  budgetId      String
+  contracts     Contract[] // Зв'язок з договорами
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@unique([code, budgetId]) // Унікальний код КЕКВ в межах одного кошторису
+}
+
+// Модель для договорів
+model Contract {
+  id            String      @id @default(cuid())
+  number        String      // Номер договору
+  name          String      // Назва договору
+  dkCode        String      // Код ДК
+  dkName        String      // Назва за ДК
+  contractor    String      // Контрагент
+  amount        Float       // Сума договору
+  startDate     DateTime    // Дата договору
+  endDate       DateTime    // Дата закінчення
+  status        String      // Статус договору (DRAFT, ACTIVE, COMPLETED, TERMINATED)
+  // Зв'язок з кошторисом та КЕКВ
+  budget        Budget      @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  budgetId      String
+  kekv          KEKV       @relation(fields: [kekvId], references: [id], onDelete: Cascade)
+  kekvId        String
+  // Специфікації договору
+  specifications Specification[]
+  // Платежі за договором
+  payments      Payment[]
+  vehicles      Vehicle[]   // Связь с автомобилями
+  user          User       @relation(fields: [userId], references: [id])
+  userId        String
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+}
+
+// Модель для специфікацій договору
+model Specification {
+  id          String   @id @default(cuid())
+  name        String   // Назва товару/послуги
+  code        String   // Код товару
+  unit        String   // Одиниця виміру
+  quantity    Float    // Кількість
+  price       Float    // Ціна за одиницю
+  amount      Float    // Загальна сума (quantity * price)
+  section     String?  // Розділ (Послуги/Використані запчастини)
+  serviceCount Int?    // Кількість обслуговувань (для послуг)
+  contract    Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  contractId  String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Модель для платежів
+model Payment {
+  id          String    @id @default(cuid())
+  amount      Float     // Сума платежу
+  date        DateTime  // Дата платежу
+  description String?   // Опис/призначення платежу
+  contract    Contract  @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  contractId  String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// Модель для транспортных средств
+model Vehicle {
+  id             String     @id @default(cuid())
+  model          String     // Модель автомобиля
+  militaryNumber String     // Военный номер
+  vin            String     @unique // VIN номер
+  location       String?    // Местоположение
+  year           Int?       // Год выпуска
+  status         String?    // Статус
+  notes          String?    // Примечания
+  user           User       @relation(fields: [userId], references: [id])
+  userId         String
+  contracts      Contract[] // Связь с контрактами
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+}
